@@ -1,4 +1,4 @@
-from . import abc
+from .. import abc
 
 #** Classes **#
 
