@@ -1,4 +1,5 @@
-from . import abc
+from .. import abc
+from typing import List
 
 #** Variables **#
 __all__ = [
@@ -8,8 +9,17 @@ __all__ = [
 
 #** Classes **#
 
-class Ipv4(abc.FourByteObject):
+class Ipv4(abc.ByteObject):
     """basic ipv4 type used to compare/store ip addresses"""
+
+    def __init__(self, a: int, b: int, c: int, d: int):
+        """
+        :param a: first octet of Ipv4
+        :param b: second octet of Ipv4
+        :param c: third octect of Ipv4
+        :param d: fourth octet of Ipv4
+        """
+        super(Ipv4, self).__init__(4, [a, b, c, d])
 
     def __str__(self) -> str:
         return '<ipv4: %s>' % self.to_string()
@@ -35,8 +45,14 @@ class Ipv4(abc.FourByteObject):
         """
         return '%d.%d.%d.%d' % tuple(self._addr)
 
-class MacAddress(abc.FourByteObject):
+class MacAddress(abc.ByteObject):
     """basic mac-address type used to compare/store mac addresses"""
+
+    def __init__(self, bytes: List[int]):
+        """
+        :param bytes: list of bytes used to generate mac-address
+        """
+        super(MacAddress, self).__init__(len(bytes), bytes)
 
     def __str__(self) -> str:
         return '<mac: %s>' % self.to_string()
@@ -52,7 +68,7 @@ class MacAddress(abc.FourByteObject):
         mac = mac.replace(':', '')
         if len(mac) != 12:
             raise TypeError('invalid mac-address: %r' % mac)
-        return MacAddress.from_bytes(bytes.tohex(mac))
+        return MacAddress.from_bytes(bytes.fromhex(mac))
 
     def to_string(self) -> str:
         """
