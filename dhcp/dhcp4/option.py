@@ -206,6 +206,21 @@ class OptMessageType(Option):
         """convert option to raw byte-string"""
         return bytes((self.opcode, 1, self.type.value))
 
+class OptParameterRequestList(Option):
+    """list all paramters requested during discovery packet"""
+    opcode = 55
+
+    def __init__(self, params: List[Param]):
+        """
+        :param params: list of paramters being requested via dhcp discovery
+        """
+        self.params = params
+
+    def to_bytes(self) -> bytes:
+        """convert option to raw byte-string"""
+        return bytes((self.opcode, len(self.params))) + \
+            bytes(p.value if isinstance(p, Param) else p for p in self.params)
+
 class OptMaxMessageSize(Option):
     """the Maximum DHCP Message Size option is described by RFC 2132"""
     opcode = 57
@@ -219,6 +234,31 @@ class OptMaxMessageSize(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode, 2)) + struct.pack('>H', self.max_length)
+
+class OptVendorClassIdentifier(Option):
+    """includes vendor information"""
+    opcode = 60
+
+class OptClientIdentifier(Option):
+    """extended client identification"""
+    opcode = 61
+
+    def __init__(self, hwtype: iana.HWType, mac: net.MacAddress):
+        """
+        :param hwtype: hardware-type of mac address being given
+        :param mac:    mac-address of client
+        """
+        self.hwtype = hwtype
+        self.mac    = mac
+
+    def to_bytes(self) -> bytes:
+        """convert option to raw byte-string"""
+        raw = self.mac.to_bytes()
+        return bytes((self.opcode, len(raw)+1, self.hwtype.value))+raw
+
+class OptUserClassInfo(Option):
+    """includes user class information"""
+    opcode = 77
 
 class OptClientSystemArchitecture(Option):
     """lists all types of architectures client currently supports"""
@@ -251,50 +291,6 @@ class OptClientNetworkDeviceInterface(Option):
         """convert option to raw byte-string"""
         return bytes((self.opcode, 3, 1, self.major, self.minor))
 
-class OptVendorClassIdentifier(Option):
-    """includes vendor information"""
-    opcode = 60
-
-class OptUserClassInfo(Option):
-    """includes user class information"""
-    opcode = 77
-
-class OptParameterRequestList(Option):
-    """list all paramters requested during discovery packet"""
-    opcode = 55
-
-    def __init__(self, params: List[Param]):
-        """
-        :param params: list of paramters being requested via dhcp discovery
-        """
-        self.params = params
-
-    def to_bytes(self) -> bytes:
-        """convert option to raw byte-string"""
-        return bytes((self.opcode, len(self.params))) + \
-            bytes(p.value if isinstance(p, Param) else p for p in self.params)
-
-class OptEtherBoot(Option):
-    """extended PXE functionality via gPXE"""
-    opcode = 175
-
-class OptClientIdentifier(Option):
-    """extended client identification"""
-    opcode = 61
-
-    def __init__(self, hwtype: iana.HWType, mac: net.MacAddress):
-        """
-        :param hwtype: hardware-type of mac address being given
-        :param mac:    mac-address of client
-        """
-        self.hwtype = hwtype
-        self.mac    = mac
-
-    def to_bytes(self) -> bytes:
-        """convert option to raw byte-string"""
-        raw = self.mac.to_bytes()
-        return bytes((self.opcode, len(raw)+1, self.hwtype.value))+raw
-
 class OptXXIDClientIdentifier(Option):
     """uuid/guid client based identifier"""
     opcode = 97
@@ -302,6 +298,10 @@ class OptXXIDClientIdentifier(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode, len(self.value)+1, 0)) + self.value
+
+class OptEtherBoot(Option):
+    """extended PXE functionality via gPXE"""
+    opcode = 175
 
 # TODO: impelement byte-code conversion (and enable methods/vars to function as option)
 # TODO: re-order options in order of opcodes if possible
