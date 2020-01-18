@@ -25,6 +25,16 @@ class Ipv4(abc.ByteObject):
         return '<ipv4: %s>' % self.to_string()
 
     @staticmethod
+    def from_bytes(raw: bytes) -> 'Ipv4':
+        """
+        convert raw byte-string into address object
+
+        :param raw: byte-string being turned into Ipv4
+        :return:    newly generated address object
+        """
+        return Ipv4(*[b for b in raw])
+
+    @staticmethod
     def from_string(ip: str) -> 'Ipv4':
         """
         convert ipv4 string into ipv4 object
@@ -48,7 +58,7 @@ class Ipv4(abc.ByteObject):
 class MacAddress(abc.ByteObject):
     """basic mac-address type used to compare/store mac addresses"""
 
-    def __init__(self, bytes: List[int]):
+    def __init__(self, bytes: bytes):
         """
         :param bytes: list of bytes used to generate mac-address
         """
@@ -56,6 +66,16 @@ class MacAddress(abc.ByteObject):
 
     def __str__(self) -> str:
         return '<mac: %s>' % self.to_string()
+
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'MacAddress':
+        """
+        convert raw byte-string into address object
+
+        :param raw: byte-string being turned into MacAddress
+        :return:    newly generated address object
+        """
+        return MacAddress(raw)
 
     @staticmethod
     def from_string(mac: str) -> 'MacAddress':
@@ -76,5 +96,5 @@ class MacAddress(abc.ByteObject):
 
         :return: hex-string formatted from saved byte-string
         """
-        mac = self._addr.tohex()
+        mac = self._addr.hex()
         return ':'.join([mac[i:i+2] for i in range(0, len(mac), 2)])
