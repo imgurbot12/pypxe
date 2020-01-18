@@ -115,9 +115,8 @@ class DHCPv4(abc.ByteOperator):
         hlen       = int(raw[2])
         end_hwaddr = 28+hlen
         return DHCPv4(
-            op=raw[0],
-            htype=raw[1],
-            hlen=hlen,
+            op=abc.find_enum(const.OpCode, raw[0]),
+            htype=abc.find_enum(iana.HWType, raw[1]),
             hops=raw[4],
             trans_id=TransactionID.from_bytes(raw[4:8]),
             secs=struct.unpack('>H', raw[8:10])[0],
@@ -127,8 +126,8 @@ class DHCPv4(abc.ByteOperator):
             server_addr=net.Ipv4.from_bytes(raw[20:24]),
             gateway_addr=net.Ipv4.from_bytes(raw[24:28]),
             client_hwaddr=net.MacAddress.from_bytes(raw[28:end_hwaddr]),
-            server_name=raw[end_hwaddr:end_hwaddr+64].rstrip('\x00'),
-            boot_file=raw[end_hwaddr+64:end_hwaddr+192].rstrip('\x00'),
+            server_name=raw[end_hwaddr:end_hwaddr+64].rstrip(b'\x00'),
+            boot_file=raw[end_hwaddr+64:end_hwaddr+192].rstrip(b'\x00'),
             options=[],
         )
         #TODO: opcode is not translated to enum on deserialization
