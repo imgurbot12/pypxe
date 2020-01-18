@@ -1,6 +1,6 @@
 import enum
 import struct
-from typing import List
+from typing import Tuple, List
 
 from . import const
 from .. import abc
@@ -172,7 +172,47 @@ class Param(enum.Enum):
     # Options 224-254 are reserved for private use
     End = 255
 
-#TODO: implement from-bytes operations for existing options
+# hidden cache for all found option objects
+_options: List['Option'] = []
+
+#** Functions **#
+
+def _from_bytes(raw: bytes) -> Tuple['Option', int]:
+    """
+    convert raw bytes into appropriate option object
+
+    :param raw: raw-bytes being converted into option object
+    :return:    generated option object w/ loaded values and num of bytes read
+    """
+    # retrieve list of options from globals
+    global _options
+    if not _options:
+        classes  = [i for n,i in globals().items() if n.startswith('Opt')]
+        _options = [item for item in classes if issubclass(item, Option)]
+    # iterate options until opcode matches
+    optlen = int(raw[1]) + 2
+    print(raw[0], optlen)
+    for opt in _options:
+        if opt.opcode.value == raw[0]:
+            return opt.from_bytes(raw[2:optlen]), optlen
+    # else if no option was found
+    return Option.from_bytes(raw[2:optlen]), optlen
+
+def from_bytes(raw: bytes) -> List['Option']:
+    """
+    convert raw bytes into list of option objects
+
+    :param raw: raw-bytes being converted into option object
+    :return:    list of options parsed from bytes
+    """
+    (options, mod) = ([], 0)
+    while raw:
+        opt, mod = _from_bytes(raw)
+        raw      = raw[mod:]
+        options.append(opt)
+        if raw[0] == 255:
+            break
+    return options
 
 #** Classes **#
 
@@ -250,7 +290,7 @@ class OptIPLeaseTime(Option):
     @staticmethod
     def from_bytes(raw: bytes) -> 'OptIPLeaseTime':
         """convert raw-bytes into option object"""
-        return OptIPLeaseTime(secs=struct.unpack('>I', raw))
+        return OptIPLeaseTime(secs=struct.unpack('>I', raw)[0])
 
 class OptMessageType(Option):
     """adds the DHCPv4 message type to a packet"""
@@ -315,7 +355,7 @@ class OptMaxMessageSize(Option):
     @staticmethod
     def from_bytes(raw: bytes) -> 'OptMessageType':
         """convert raw-bytes into option object"""
-        return OptMaxMessageSize(struct.unpack('>H', raw))
+        return OptMaxMessageSize(struct.unpack('>H', raw)[0])
 
 class OptClassIdentifier(Option):
     """includes vendor information"""
