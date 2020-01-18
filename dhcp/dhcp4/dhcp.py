@@ -82,6 +82,29 @@ class DHCPv4(abc.ByteOperator):
         self.server_name   = server_name
         self.boot_file     = boot_file
 
+    def summary(self) -> str:
+        """
+        provide stringed summary of entire dhcp packet
+
+        :return: summary of dhcp-packet as string
+        """
+        #TODO: add summaried options as well
+        return f"""OpCode: {self.op}
+HWType: {self.htype}
+HWLen:  {self.hlen}
+Hops:   {self.hops}
+TransID:  {self.xid}
+Seconds:  {self.secs}
+Flags:    {self.flags}
+ClientIP: {self.client_addr.to_string()}
+YourIP:   {self.your_addr.to_string()}
+ServerIP: {self.server_addr.to_string()}
+RelayIP:  {self.gateway_addr.to_string()}
+ClientMac: {self.client_hwaddr.to_string()}
+ServerHost: {self.server_name}
+BootFile:   {self.boot_file}
+"""
+
     def to_bytes(self) -> bytes:
         """
         convert DHCPv4 object into bytes
@@ -112,12 +135,11 @@ class DHCPv4(abc.ByteOperator):
         :param raw: raw byte-string to be parsed and converted
         :return:    generated DHCPv4 packet object
         """
-        hlen       = int(raw[2])
-        end_hwaddr = 28+hlen
+        hlen    = int(raw[2])
         return DHCPv4(
             op=abc.find_enum(const.OpCode, raw[0]),
             htype=abc.find_enum(iana.HWType, raw[1]),
-            hops=raw[4],
+            hops=raw[3],
             trans_id=TransactionID.from_bytes(raw[4:8]),
             secs=struct.unpack('>H', raw[8:10])[0],
             flags=struct.unpack('>H', raw[10:12])[0],
@@ -125,10 +147,10 @@ class DHCPv4(abc.ByteOperator):
             your_addr=net.Ipv4.from_bytes(raw[16:20]),
             server_addr=net.Ipv4.from_bytes(raw[20:24]),
             gateway_addr=net.Ipv4.from_bytes(raw[24:28]),
-            client_hwaddr=net.MacAddress.from_bytes(raw[28:end_hwaddr]),
-            server_name=raw[end_hwaddr:end_hwaddr+64].rstrip(b'\x00'),
-            boot_file=raw[end_hwaddr+64:end_hwaddr+192].rstrip(b'\x00'),
-            options=[],
+            client_hwaddr=net.MacAddress.from_bytes(raw[28:28+hlen]),
+            server_name=raw[44:108].rstrip(b'\x00'),
+            boot_file=raw[108:236].rstrip(b'\x00'),
+            options=option.from_bytes(raw[240:]),
         )
         #TODO: opcode is not translated to enum on deserialization
         #TODO: options are not parsed
