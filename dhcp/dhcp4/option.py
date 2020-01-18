@@ -12,7 +12,7 @@ from ..net import iana
 
 #** Classes **#
 
-class Param:
+class Param(enum.Enum):
     """DHCP Request Paramter List Paramters"""
     OptionPad                                  = 0
     SubnetMask                                 = 1
@@ -179,7 +179,7 @@ class Param:
 
 class Option(abc.ByteOperator):
     """base class for all option objects"""
-    opcode = 0
+    opcode = Param.OptionPad
 
     def __init__(self, value: bytes):
         """
@@ -189,12 +189,58 @@ class Option(abc.ByteOperator):
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
-        return bytes((self.opcode, len(self.value))) + self.value
+        return bytes((self.opcode.value, len(self.value))) + self.value
 
+class _IPv4Option:
+    """base-class implementation for single ip-paramter option classes"""
+
+    def __init__(self, ip: net.Ipv4):
+        """
+        :param ip: designated ip-address
+        """
+        self.ip = ip
+
+    def to_bytes(self) -> bytes:
+        """convert option to raw byte-string"""
+        return bytes((self.opcode.value, 4)) + self.ip.to_bytes()
+
+class OptSubnetMask(_IPv4Option):
+    """sets subnet mask to be used when on network"""
+    opcode = Param.SubnetMask
+
+class OptRouter(_IPv4Option):
+    """sets router ip-address to allow internet connectivity"""
+    opcode = Param.Router
+
+class OptDomainNameServer(_IPv4Option):
+    """sets domain-name server used to make DNS requests"""
+    opcode = Param.DomainNameServer
+
+class OptRequestedAddress(_IPv4Option):
+    """tells dhcp server what client wants their ip-address to be"""
+    opcode = Param.RequestedIPAddress
+
+class OptIPLeaseTime(Option):
+    """sets maxiumum lease-time for given settings from dhcp-server"""
+    opcode = Param.IPAddressLeaseTime
+
+    def __init__(self,
+        secs: int = 0, mins: int = 0, hours: int = 0, days: int = 0):
+        """
+        :param secs:  number of seconds in lease
+        :param mins:  number of minutes in lease
+        :param hours: number of hours in lease
+        :param days:  number of days in lease
+        """
+        self.lease = secs + (mins * 60) + (hours * 3600) + (days * 86400)
+
+    def to_bytes(self) -> bytes:
+        """convert option to raw byte-string"""
+        return bytes((self.opcode.value, 4)) + struct.pack('>I', self.lease)
 
 class OptMessageType(Option):
     """adds the DHCPv4 message type to a packet"""
-    opcode = 53
+    opcode = Param.DHCPMessageType
 
     def __init__(self, type: const.MessageType):
         """
@@ -204,11 +250,15 @@ class OptMessageType(Option):
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
-        return bytes((self.opcode, 1, self.type.value))
+        return bytes((self.opcode.value, 1, self.type.value))
+
+class OptServerIdentifier(_IPv4Option):
+    """declares which server is sending this response packet"""
+    opcode = Param.ServerIdentifier
 
 class OptParameterRequestList(Option):
     """list all paramters requested during discovery packet"""
-    opcode = 55
+    opcode = Param.ParameterRequestList
 
     def __init__(self, params: List[Param]):
         """
@@ -218,12 +268,12 @@ class OptParameterRequestList(Option):
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
-        return bytes((self.opcode, len(self.params))) + \
+        return bytes((self.opcode.value, len(self.params))) + \
             bytes(p.value if isinstance(p, Param) else p for p in self.params)
 
 class OptMaxMessageSize(Option):
     """the Maximum DHCP Message Size option is described by RFC 2132"""
-    opcode = 57
+    opcode = Param.MaximumDHCPMessageSize
 
     def __init__(self, max_length: int):
         """
@@ -233,15 +283,15 @@ class OptMaxMessageSize(Option):
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
-        return bytes((self.opcode, 2)) + struct.pack('>H', self.max_length)
+        return bytes((self.opcode.value, 2)) + struct.pack('>H',self.max_length)
 
-class OptVendorClassIdentifier(Option):
+class OptClassIdentifier(Option):
     """includes vendor information"""
-    opcode = 60
+    opcode = Param.ClassIdentifier
 
 class OptClientIdentifier(Option):
     """extended client identification"""
-    opcode = 61
+    opcode = Param.ClientIdentifier
 
     def __init__(self, hwtype: iana.HWType, mac: net.MacAddress):
         """
@@ -254,15 +304,15 @@ class OptClientIdentifier(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         raw = self.mac.to_bytes()
-        return bytes((self.opcode, len(raw)+1, self.hwtype.value))+raw
+        return bytes((self.opcode.value, len(raw)+1, self.hwtype.value)) + raw
 
 class OptUserClassInfo(Option):
     """includes user class information"""
-    opcode = 77
+    opcode = Param.UserClassInformation
 
 class OptClientSystemArchitecture(Option):
     """lists all types of architectures client currently supports"""
-    opcode = 93
+    opcode = Param.ClientSystemArchitectureType
 
     def __init__(self, archs: iana.ArchList):
         """
@@ -273,11 +323,11 @@ class OptClientSystemArchitecture(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         raw = self.archs.to_bytes()
-        return bytes((self.opcode, len(raw))) + raw
+        return bytes((self.opcode.value, len(raw))) + raw
 
-class OptClientNetworkDeviceInterface(Option):
+class OptClientNetworkInterface(Option):
     """declares PXE device interface version required for PXE (RFC 4578)"""
-    opcode = 94
+    opcode = Param.ClientNetworkInterfaceIdentifier
 
     def __init__(self, major: int, minor: int):
         """
@@ -289,19 +339,19 @@ class OptClientNetworkDeviceInterface(Option):
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
-        return bytes((self.opcode, 3, 1, self.major, self.minor))
+        return bytes((self.opcode.value, 3, 1, self.major, self.minor))
 
 class OptXXIDClientIdentifier(Option):
     """uuid/guid client based identifier"""
-    opcode = 97
+    opcode = Param.ClientMachineIdentifier
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
-        return bytes((self.opcode, len(self.value)+1, 0)) + self.value
+        return bytes((self.opcode.value, len(self.value)+1, 0)) + self.value
 
 class OptEtherBoot(Option):
     """extended PXE functionality via gPXE"""
-    opcode = 175
+    opcode = Param.Etherboot
 
 # TODO: impelement byte-code conversion (and enable methods/vars to function as option)
 # TODO: re-order options in order of opcodes if possible
