@@ -7,10 +7,7 @@ from .. import abc
 from .. import net
 from ..net import iana
 
-
 #** Variables **#
-
-#** Classes **#
 
 class Param(enum.Enum):
     """DHCP Request Paramter List Paramters"""
@@ -177,6 +174,8 @@ class Param(enum.Enum):
 
 #TODO: implement from-bytes operations for existing options
 
+#** Classes **#
+
 class Option(abc.ByteOperator):
     """base class for all option objects"""
     opcode = Param.OptionPad
@@ -191,6 +190,11 @@ class Option(abc.ByteOperator):
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, len(self.value))) + self.value
 
+    @classmethod
+    def from_bytes(cls, raw: bytes) -> 'Option':
+        """convert raw-bytes into option object"""
+        return cls(raw)
+
 class _IPv4Option:
     """base-class implementation for single ip-paramter option classes"""
 
@@ -203,6 +207,11 @@ class _IPv4Option:
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 4)) + self.ip.to_bytes()
+
+    @staticmethod
+    def from_bytes(raw: bytes) -> '_IPv4Option':
+        """convert raw-bytes into option object"""
+        return _IPv4Option(net.Ipv4.from_bytes(raw))
 
 class OptSubnetMask(_IPv4Option):
     """sets subnet mask to be used when on network"""
@@ -238,6 +247,11 @@ class OptIPLeaseTime(Option):
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 4)) + struct.pack('>I', self.lease)
 
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptIPLeaseTime':
+        """convert raw-bytes into option object"""
+        return OptIPLeaseTime(secs=struct.unpack('>I', raw))
+
 class OptMessageType(Option):
     """adds the DHCPv4 message type to a packet"""
     opcode = Param.DHCPMessageType
@@ -251,6 +265,11 @@ class OptMessageType(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 1, self.type.value))
+
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptMessageType':
+        """convert raw-bytes into option object"""
+        return OptMessageType(abc.find_enum(const.MessageType, raw[0]))
 
 class OptServerIdentifier(_IPv4Option):
     """declares which server is sending this response packet"""
@@ -271,6 +290,14 @@ class OptParameterRequestList(Option):
         return bytes((self.opcode.value, len(self.params))) + \
             bytes(p.value if isinstance(p, Param) else p for p in self.params)
 
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptParameterRequestList':
+        """convert raw-bytes into option object"""
+        return OptParameterRequestList([
+            abc.find_enum(Param, byte, byte)
+            for byte in raw
+        ])
+
 class OptMaxMessageSize(Option):
     """the Maximum DHCP Message Size option is described by RFC 2132"""
     opcode = Param.MaximumDHCPMessageSize
@@ -284,6 +311,11 @@ class OptMaxMessageSize(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 2)) + struct.pack('>H',self.max_length)
+
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptMessageType':
+        """convert raw-bytes into option object"""
+        return OptMaxMessageSize(struct.unpack('>H', raw))
 
 class OptClassIdentifier(Option):
     """includes vendor information"""
@@ -306,6 +338,14 @@ class OptClientIdentifier(Option):
         raw = self.mac.to_bytes()
         return bytes((self.opcode.value, len(raw)+1, self.hwtype.value)) + raw
 
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptClientIdentifier':
+        """convert raw-bytes into option object"""
+        return OptClientIdentifier(
+            hwtype=abc.find_enum(iana.HWType, raw[0]),
+            mac=net.MacAddress.from_bytes(raw[1:])
+        )
+
 class OptUserClassInfo(Option):
     """includes user class information"""
     opcode = Param.UserClassInformation
@@ -325,6 +365,11 @@ class OptClientSystemArchitecture(Option):
         raw = self.archs.to_bytes()
         return bytes((self.opcode.value, len(raw))) + raw
 
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptClientSystemArchitecture':
+        """convert raw-bytes into option object"""
+        return OptClientSystemArchitecture(iana.ArchList.from_bytes(raw))
+
 class OptClientNetworkInterface(Option):
     """declares PXE device interface version required for PXE (RFC 4578)"""
     opcode = Param.ClientNetworkInterfaceIdentifier
@@ -341,6 +386,11 @@ class OptClientNetworkInterface(Option):
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 3, 1, self.major, self.minor))
 
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptClientNetworkInterface':
+        """convert raw-bytes into option object"""
+        return OptClientNetworkInterface(raw[1], raw[2])
+
 class OptXXIDClientIdentifier(Option):
     """uuid/guid client based identifier"""
     opcode = Param.ClientMachineIdentifier
@@ -348,6 +398,11 @@ class OptXXIDClientIdentifier(Option):
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, len(self.value)+1, 0)) + self.value
+
+    @staticmethod
+    def from_bytes(raw: bytes) -> 'OptXXIDClientIdentifier':
+        """convert raw-bytes into option object"""
+        return OptXXIDClientIdentifier(raw[1:])
 
 class OptEtherBoot(Option):
     """extended PXE functionality via gPXE"""
