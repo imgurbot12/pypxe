@@ -1,10 +1,27 @@
-from typing import List, Union
+import enum
+from typing import Any, List, Union
 
 #** Variables **#
 __all__ = [
+    'find_enum',
     'ByteOperator',
     'ByteObject',
 ]
+
+#** Functions **#
+
+def find_enum(enum: enum.Enum, value: Any, default: Any = None) -> Any:
+    """
+    find value by value in enum object
+
+    :param enum:    enumeration object being collected from
+    :param value:   value being retrieved from enum object
+    :param default: default value to return only if default is not none
+    """
+    if default is None:
+        if value not in enum._value2member_map_:
+            raise ValueError('no such value: %r in enum: %s' % (value, enum))
+    return enum._value2member_map_[value]
 
 #** Classes **#
 

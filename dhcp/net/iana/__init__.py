@@ -131,8 +131,8 @@ class ArchList(abc.ByteOperator):
         archs = []
         for arch in (raw[i:i+2] for i in range(0, len(raw), 2)):
             value = struct.unpack('>H', arch)[0]
-            arch = Arch._value2member_map_.get(value, None)
-            if arch is None:
+            arch = abc.find_enum(Arch, value, False)
+            if arch is False:
                 raise ValueError('invalid arch-value: %r' % value)
             archs.append(arch)
         return ArchList(archs)
