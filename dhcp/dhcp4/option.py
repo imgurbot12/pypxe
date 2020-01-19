@@ -1,6 +1,6 @@
 import enum
 import struct
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Generator
 
 from . import const
 from .. import abc, iana, net
@@ -227,25 +227,28 @@ def _from_bytes(raw: bytes) -> Tuple['Option', int]:
     # retrieve list of options from globals
     global _options
     if not _options:
-        classes  = [i for n,i in globals().items() if n.startswith('Opt')]
-        _options = [item for item in classes if issubclass(item, Option)]
+        classes  = (i for n,i in globals().items() if n.startswith('Opt'))
+        _options = {
+            item.opcode.value:item
+            for item in classes if issubclass(item, Option)
+        }
     # iterate options until opcode matches
     optlen = int(raw[1]) + 2
-    for opt in _options:
-        if opt.opcode.value == raw[0]:
-            return opt.from_bytes(raw[2:optlen]), optlen
+    if raw[0] in _options:
+        opt = _options[raw[0]]
+        return opt.from_bytes(raw[2:optlen]), optlen
     # else if no option was found
     return Option.from_bytes(raw[2:optlen]), optlen
 
-def from_bytes(raw: bytes) -> List['Option']:
+def from_bytes(raw: bytes) -> Generator['Option', None, None]:
     """
     convert raw bytes into list of option objects
 
     :param raw: raw-bytes being converted into option object
     :return:    list of options parsed from bytes
     """
-    (options, mod) = ([], 0)
-    while raw:
+    options = []
+    while True:
         opt, mod = _from_bytes(raw)
         raw      = raw[mod:]
         options.append(opt)
