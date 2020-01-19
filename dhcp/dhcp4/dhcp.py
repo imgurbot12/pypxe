@@ -8,9 +8,10 @@ from .. import abc, iana, net
 
 #** Variables **#
 __all__ = [
-    'IpZero'
+    'IpZero',
     'magic_cookie',
 
+    'TransactionID',
     'DHCPv4',
 ]
 
