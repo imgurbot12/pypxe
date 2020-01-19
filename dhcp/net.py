@@ -1,4 +1,4 @@
-from .. import abc
+from . import abc
 from typing import List
 
 #** Variables **#

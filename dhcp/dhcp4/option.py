@@ -3,9 +3,7 @@ import struct
 from typing import Tuple, List, Any
 
 from . import const
-from .. import abc
-from .. import net
-from ..net import iana
+from .. import abc, iana, net
 
 #** Variables **#
 

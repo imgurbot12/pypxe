@@ -2,11 +2,9 @@ import enum
 import struct
 from typing import List
 
-from .. import abc
-from .. import net
 from . import const
 from . import option
-from ..net import iana
+from .. import abc, iana, net
 
 #** Variables **#
 __all__ = [
