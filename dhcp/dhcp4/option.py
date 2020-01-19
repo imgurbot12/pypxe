@@ -6,6 +6,29 @@ from . import const
 from .. import abc, iana, net
 
 #** Variables **#
+__all__ = [
+    'Param',
+
+    'from_bytes',
+
+    'Option',
+    'OptSubnetMask',
+    'OptRouter',
+    'OptDomainNameServer',
+    'OptRequestedAddress',
+    'OptIPLeaseTime',
+    'OptMessageType',
+    'OptServerIdentifier',
+    'OptParameterRequestList',
+    'OptMaxMessageSize',
+    'OptClassIdentifier',
+    'OptClientIdentifier',
+    'OptUserClassInfo',
+    'OptClientSystemArchitecture',
+    'OptClientNetworkInterface',
+    'OptXXIDClientIdentifier',
+    'OptEtherBoot'
+]
 
 class Param(enum.Enum):
     """DHCP Request Paramter List Paramters"""
@@ -271,7 +294,7 @@ class Option(abc.ByteOperator):
         """convert raw-bytes into option object"""
         return cls(raw)
 
-class _IPv4Option:
+class _IPv4Option(Option):
     """base-class implementation for single ip-paramter option classes"""
 
     def __init__(self, ip: net.Ipv4):
@@ -284,10 +307,10 @@ class _IPv4Option:
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 4)) + self.ip.to_bytes()
 
-    @staticmethod
-    def from_bytes(raw: bytes) -> '_IPv4Option':
+    @classmethod
+    def from_bytes(cls, raw: bytes) -> '_IPv4Option':
         """convert raw-bytes into option object"""
-        return _IPv4Option(net.Ipv4.from_bytes(raw))
+        return cls(net.Ipv4.from_bytes(raw))
 
 class OptSubnetMask(_IPv4Option):
     """sets subnet mask to be used when on network"""
