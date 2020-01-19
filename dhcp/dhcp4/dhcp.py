@@ -89,6 +89,7 @@ class DHCPv4(abc.ByteOperator):
         :return: summary of dhcp-packet as string
         """
         #TODO: add summaried options as well
+        nl = '\n'
         return f"""OpCode: {self.op}
 HWType: {self.htype}
 HWLen:  {self.hlen}
@@ -103,7 +104,8 @@ RelayIP:  {self.gateway_addr.to_string()}
 ClientMac: {self.client_hwaddr.to_string()}
 ServerHost: {self.server_name}
 BootFile:   {self.boot_file}
-"""
+Options:
+{nl.join(opt.summary(prefix='  ') for opt in self.options)}"""
 
     def to_bytes(self) -> bytes:
         """
@@ -152,6 +154,4 @@ BootFile:   {self.boot_file}
             boot_file=raw[108:236].rstrip(b'\x00'),
             options=option.from_bytes(raw[240:]),
         )
-        #TODO: opcode is not translated to enum on deserialization
-        #TODO: options are not parsed
         #TODO: to/from bytes has not yet been checked

@@ -1,6 +1,6 @@
 import enum
 import struct
-from typing import Tuple, List
+from typing import Tuple, List, Any
 
 from . import const
 from .. import abc
@@ -177,6 +177,25 @@ _options: List['Option'] = []
 
 #** Functions **#
 
+def _stringify(item: Any, prefix: str = '') -> str:
+    """
+    stringify value to print reguardless of inbound type
+
+    :param item:   item being converted into string value
+    :param prefix: append prefix to certain string formations
+    :return:       strinified variable retrieved from option
+    """
+    if hasattr(item, 'to_string'):
+        return item.to_string()
+    elif isinstance(item, bytes):
+        return item.hex()
+    elif isinstance(item, list):
+        return prefix+'\n'+'\n'.join(prefix+' - %s'%_stringify(i) for i in item)
+    elif isinstance(item, enum.Flag):
+        return item.name
+    else:
+        return str(item)
+
 def _from_bytes(raw: bytes) -> Tuple['Option', int]:
     """
     convert raw bytes into appropriate option object
@@ -191,7 +210,6 @@ def _from_bytes(raw: bytes) -> Tuple['Option', int]:
         _options = [item for item in classes if issubclass(item, Option)]
     # iterate options until opcode matches
     optlen = int(raw[1]) + 2
-    print(raw[0], optlen)
     for opt in _options:
         if opt.opcode.value == raw[0]:
             return opt.from_bytes(raw[2:optlen]), optlen
@@ -217,7 +235,7 @@ def from_bytes(raw: bytes) -> List['Option']:
 #** Classes **#
 
 class Option(abc.ByteOperator):
-    """base class for all option objects"""
+    """base class for all option objects, allows conversion to/from bytes"""
     opcode = Param.OptionPad
 
     def __init__(self, value: bytes):
@@ -225,6 +243,26 @@ class Option(abc.ByteOperator):
         :param value: raw-bytes value being passed as option
         """
         self.value = value
+
+    def __str__(self) -> str:
+        return '<Option: %s>' % (self.opcode.name)
+
+    def summary(self, prefix: str = '') -> str:
+        """
+        retrieve complete summary of option object
+
+        :param prefix: append prefix to start of every line
+        :return:       multi-line summary of option object and all vars
+        """
+        return '%sOption: %s<%s>\n%s' % (
+            prefix,
+            self.opcode.name,
+            self.opcode.value,
+            '\n'.join(prefix+' - %s: %s' % (
+                k,_stringify(v, prefix))
+                for k,v in vars(self).items()
+            )
+        )
 
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
