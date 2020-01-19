@@ -1,5 +1,6 @@
 import enum
 import struct
+import random
 from typing import List
 
 from . import const
