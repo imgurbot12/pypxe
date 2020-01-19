@@ -88,7 +88,6 @@ class DHCPv4(abc.ByteOperator):
 
         :return: summary of dhcp-packet as string
         """
-        #TODO: add summaried options as well
         nl = '\n'
         return f"""OpCode: {self.op}
 HWType: {self.htype}
