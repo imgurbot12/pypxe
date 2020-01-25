@@ -2,4 +2,7 @@
 #** Variables **#
 __all__ = ['DHCPv6']
 
-from .dhcp import *
+#** Classes **#
+
+class DHCPv6:
+    pass
