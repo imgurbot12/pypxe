@@ -65,8 +65,6 @@ def _new_handler(
 
 #** Classes **#
 
-#TODO: maybe find a way to send errors back to dhcp-server instance for logging
-
 class _Handler(asyncio.DatagramProtocol):
     """metaclass handler for incoming udp packets built for DHCPv4"""
     _log:       logging.Logger
@@ -109,8 +107,6 @@ class _Handler(asyncio.DatagramProtocol):
         except Exception as e:
             self._log.error('unable to send response: %s' % e)
             traceback.print_exc()
-
-#TODO: add proper logging for DHCP packets coming in / going out
 
 class DHCPServer:
     """complete DHCP server used to handle and reply to packets"""
