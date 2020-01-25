@@ -1,7 +1,7 @@
 import enum
 import struct
 import random
-from typing import List
+from typing import List, Union, Optional
 
 from . import const
 from . import option
@@ -38,7 +38,7 @@ class DHCPv4(abc.ByteOperator):
         op:            const.OpCode,
         trans_id:      TransactionID,
         client_hwaddr: net.MacAddress,
-        options:       List[option.Option],
+        options:       Union[option.Options, List[option.Option]],
         htype:         iana.HWType         = iana.HWType.Ethernet,
         hops:          int                 = 0,
         secs:          int                 = 0,
@@ -69,7 +69,6 @@ class DHCPv4(abc.ByteOperator):
         self.op            = op
         self.xid           = trans_id
         self.client_hwaddr = client_hwaddr
-        self.options       = options
         self.htype         = htype
         self.hlen          = client_hwaddr._length
         self.hops          = hops
@@ -81,6 +80,10 @@ class DHCPv4(abc.ByteOperator):
         self.gateway_addr  = gateway_addr
         self.server_name   = server_name
         self.boot_file     = boot_file
+        if isinstance(options, option.Options):
+            self.options = options
+        else:
+            self.options = option.Options(options)
 
     def summary(self) -> str:
         """
@@ -105,6 +108,50 @@ ServerHost: {self.server_name}
 BootFile:   {self.boot_file}
 Options:
 {nl.join(opt.summary(prefix='  ') for opt in self.options)}"""
+
+    def broadcast_address(self) -> Optional[net.Ipv4]:
+        """
+        retrieve broadcast-address from options if available
+
+        :return: ip-address or none if not found
+        """
+        return self.options.get_ip(option.Param.BroadcastAddress)
+
+    def requested_address(self) -> Optional[net.Ipv4]:
+        """
+        retrieve requested ip-address from options if available
+
+        :return: ip-address or none if not found
+        """
+        return self.options.get_ip(option.Param.RequestedIPAddress)
+
+    def server_identifier(self) -> Optional[net.Ipv4]:
+        """
+        retrieve server-identifier from options if available
+
+        :return: ip-address or none if not found
+        """
+        return self.options.get_ip(option.Param.ServerIdentifier)
+
+    def message_type(self) -> Optional[const.MessageType]:
+        """
+        retrieve message-type from options if available
+
+        :return: message-type retrieved from dhcp options
+        """
+        if option.Param.DHCPMessageType in self.options:
+            return self.options[option.Param.DHCPMessageType].type
+        return None
+
+    def paramter_list(self) -> List[option.Param]:
+        """
+        retrieve list of paramters requested in message
+
+        :return: list of all paramteres asked for in message
+        """
+        if option.Param.ParameterRequestList in self.options:
+            return self.options[option.Param.ParameterRequestList].params
+        return []
 
     def to_bytes(self) -> bytes:
         """
