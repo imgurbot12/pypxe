@@ -1,3 +1,6 @@
+"""
+generic DHCP server implementation useful for both DHCPv4 and DHCPv6
+"""
 import sys
 import socket
 import asyncio

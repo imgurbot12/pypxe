@@ -1,3 +1,6 @@
+"""
+implementation of many of the primary DHCP options included in DHCPv4 packets
+"""
 import enum
 import struct
 from typing import Tuple, List, Any, Optional

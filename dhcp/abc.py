@@ -1,3 +1,6 @@
+"""
+base objects and useful functions used as base of other classes
+"""
 import enum
 from typing import Any, List, Union
 

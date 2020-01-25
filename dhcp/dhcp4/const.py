@@ -1,3 +1,6 @@
+"""
+primary constants used in DHCPv4
+"""
 import enum
 
 #** Variables **#

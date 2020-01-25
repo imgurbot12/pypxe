@@ -1,3 +1,6 @@
+"""
+implementation of basic networking object such as IPs and Mac-Addresses
+"""
 from . import abc
 from typing import List
 

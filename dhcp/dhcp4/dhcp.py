@@ -1,3 +1,6 @@
+"""
+implementation for DHCPv4 packet w/ serialization and deserialization
+"""
 import enum
 import struct
 import random

@@ -1,3 +1,6 @@
+"""
+enums used for type restrictions and listings for DHCP parameters
+"""
 import enum
 import struct
 from . import abc
