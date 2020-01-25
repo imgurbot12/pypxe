@@ -1,6 +1,6 @@
 import enum
 import struct
-from typing import Tuple, List, Any, Generator
+from typing import Tuple, List, Any, Optional
 
 from . import const
 from .. import abc, iana, net
@@ -11,6 +11,7 @@ __all__ = [
 
     'from_bytes',
 
+    'Options',
     'Option',
     'OptSubnetMask',
     'OptRouter',
@@ -23,11 +24,14 @@ __all__ = [
     'OptMaxMessageSize',
     'OptClassIdentifier',
     'OptClientIdentifier',
+    'OptTFTPServerName',
+    'OptTFTPServerIP',
+    'OptBootFileName',
     'OptUserClassInfo',
     'OptClientSystemArchitecture',
     'OptClientNetworkInterface',
     'OptXXIDClientIdentifier',
-    'OptEtherBoot'
+    'OptEtherBoot',
 ]
 
 class Param(enum.Enum):
@@ -210,7 +214,7 @@ def _stringify(item: Any, prefix: str = '') -> str:
         return item.to_string()
     elif isinstance(item, bytes):
         return item.hex()
-    elif isinstance(item, list):
+    elif isinstance(item, (list, Options)):
         return prefix+'\n'+'\n'.join(prefix+' - %s'%_stringify(i) for i in item)
     elif isinstance(item, enum.Flag):
         return item.name
@@ -227,7 +231,8 @@ def _from_bytes(raw: bytes) -> Tuple['Option', int]:
     # retrieve list of options from globals
     global _options
     if not _options:
-        classes  = (i for n,i in globals().items() if n.startswith('Opt'))
+        classes  = (i for n,i in globals().items()
+            if n.startswith('Opt') and n not in ('Optional', 'Options'))
         _options = {
             item.opcode.value:item
             for item in classes if issubclass(item, Option)
@@ -240,7 +245,7 @@ def _from_bytes(raw: bytes) -> Tuple['Option', int]:
     # else if no option was found
     return Option.from_bytes(raw[2:optlen]), optlen
 
-def from_bytes(raw: bytes) -> Generator['Option', None, None]:
+def from_bytes(raw: bytes) -> List['Option']:
     """
     convert raw bytes into list of option objects
 
@@ -257,6 +262,68 @@ def from_bytes(raw: bytes) -> Generator['Option', None, None]:
     return options
 
 #** Classes **#
+
+class Options:
+    """dict/list hybrid allowing for quick-lookups of options"""
+
+    def __init__(self, options: List['Option']):
+        """
+        :param options: list of options to add to self
+        """
+        self._dict   = {opt.opcode.value:n for n, opt in enumerate(options, 0)}
+        self._list   = options
+
+    def __iter__(self) -> List['Option']:
+        return iter(self._list)
+
+    def __contains__(self, k: Param) -> bool:
+        return k.value in self._dict
+
+    def __getitem__(self, k: Any) -> 'Option':
+        idx = self._dict[k.value] if isinstance(k, Param) else k
+        return self._list[idx]
+
+    def get(self, k: Param, d: Any = None) -> Optional['Option']:
+        """
+        retrieve an item from the list if the paramter exists
+
+        :param k: key being used to retrieve value
+        :param d: default to return if none
+        :return:  option object or default value if not found
+        """
+        return self[k] if k in self else d
+
+    def get_ip(self, k: Param) -> Optional[net.Ipv4]:
+        """
+        retrieve the ip-address from the specified option-type if exists
+
+        :param k: key being used to retrieve value
+        :return:  ipv4 or none if not found
+        """
+        return self[k].ip if k in self else None
+
+    def append(self, option: 'Option'):
+        """
+        append an item to the options list
+
+        :param option: option to add to array
+        """
+        self._dict[option.opcode.value] = len(self._list)
+        self._list.append(option)
+
+    def extend(self, options: List['Option']):
+        """
+        append multiple items to the options list
+
+        :param options: list of options to append to list
+        """
+        idx = len(self._list)
+        self._dict.update({
+            opt.opcode.value:idx+n
+            for n, opt in enumerate(options, 0)
+        })
+        self._list.extend(options)
+
 
 class Option(abc.ByteOperator):
     """base class for all option objects, allows conversion to/from bytes"""
@@ -364,6 +431,9 @@ class OptMessageType(Option):
         """
         self.type = type
 
+    def __eq__(self, other: const.MessageType) -> bool:
+        return self.type == other
+
     def to_bytes(self) -> bytes:
         """convert option to raw byte-string"""
         return bytes((self.opcode.value, 1, self.type.value))
@@ -447,6 +517,18 @@ class OptClientIdentifier(Option):
             hwtype=abc.find_enum(iana.HWType, raw[0]),
             mac=net.MacAddress.from_bytes(raw[1:])
         )
+
+class OptTFTPServerName(Option):
+    """set TFTP server-name for PXE boot"""
+    opcode = Param.TFTPServerName
+
+class OptTFTPServerIP(_IPv4Option):
+    """sets TFTP server ip-address for PXE boot"""
+    opcode = Param.TFTPServerIPAddress
+
+class OptBootFileName(Option):
+    """set boot-file for PXE boot"""
+    opcode = Param.BootfileName
 
 class OptUserClassInfo(Option):
     """includes user class information"""
