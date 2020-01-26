@@ -1,3 +1,6 @@
+"""
+packet crafting for TFTP protocl
+"""
 import struct
 from typing import Tuple, List
 
@@ -5,11 +8,53 @@ from . import option, utils
 from .const import OpCode, RequestMode
 
 #** Variables **#
-__all__ = []
+__all__ = [
+    'from_bytes',
+
+    'Packet',
+    'Request',
+    'OptionAcknowledgement',
+    'Acknowledgement',
+    'Data'
+]
+
+#** Functions **#
+
+def from_bytes(raw: bytes) -> 'Packet':
+    """
+    convert raw-bytestring into TFTP packet object
+
+    :param raw: bytestring being parsed
+    :return:    TFTP packet object
+    """
+    op = struct.unpack('>H', raw[:2])[0]
+    if op == OpCode.ReadRequest or op == OpCode.WriteRequest:
+        return Request.from_bytes(raw)
+    elif op == OpCode.OptionAck:
+        return OptionAcknowledgement.from_bytes(raw)
+    elif op == OpCode.Ack:
+        return Acknowledgement.from_bytes(raw)
+    elif op == OpCode.Data:
+        return Data.from_bytes(raw)
+    else:
+        raise NotImplementedError('error type not supported yet!')
+        #TODO: have not written handler for error packet
 
 #** Classes **#
 
-class Request:
+class Packet:
+    op: OpCode = None
+
+    def __str__(self) -> str:
+        return '<TFTP.Packet: %s>' % self.op.name
+
+    def to_bytes(self) -> bytes:
+        raise NotImplementedError('baseclass must be overwritten!')
+
+    def from_bytes(cls, raw: bytes) -> 'Packet':
+        raise NotImplementedError('baseclass must be overwritten!')
+
+class Request(Packet):
     """complete TFTP Request packet to start sending/recieving files"""
 
     def __init__(self,
@@ -58,7 +103,7 @@ class Request:
             options=option.from_bytes(raw),
         )
 
-class OptionAcknowledgement:
+class OptionAcknowledgement(Packet):
     """complete TFTP option ack to let server know opts are accepted"""
     op = OpCode.OptionAck
 
@@ -87,7 +132,7 @@ class OptionAcknowledgement:
         """
         return cls(options=option.from_bytes(raw[2:]))
 
-class Acknowledgement:
+class Acknowledgement(Packet):
     """complete TFTP ack packet to let server know block was recieved"""
     op = OpCode.Ack
 
@@ -115,7 +160,7 @@ class Acknowledgement:
         """
         return cls(block=struct.unpack('>H', raw[2:])[0])
 
-class Data:
+class Data(Packet):
     """complete TFTP data packet used to transfer data"""
     op = OpCode.Data
 
