@@ -17,7 +17,7 @@ DefaultServerPort = 69
 
 #** Classes **#
 
-class OpCode(enum.Enum):
+class OpCode(enum.IntEnum):
     """operation codes for TFTP packets (RFC 1350)"""
     ReadRequest  = 1
     WriteRequest = 2
@@ -32,7 +32,7 @@ class RequestMode(enum.Enum):
     Octet    = "octet"
     Mail     = "mail"
 
-class ErrorCode(enum.Enum):
+class ErrorCode(enum.IntEnum):
     """possible error codes used in response"""
     NotDefined        = 0
     FileNotFound      = 1
