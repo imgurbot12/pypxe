@@ -40,8 +40,9 @@ def _logger(name: str, loglevel: int) -> logging.Logger:
     log.setLevel(loglevel)
     # spawn handler
     fmt     = logging.Formatter(
-        '%(asctime)s [%(process)d] [%(levelname)s] %(message)s')
+        '[%(process)d] [%(levelname)s] %(message)s')
     handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(fmt)
     handler.setLevel(loglevel)
     log.handlers.append(handler)
     return log
@@ -102,7 +103,15 @@ class _Handler(asyncio.DatagramProtocol):
         if addr not in self._connstate:
             if not pkt.is_request():
                 raise BadOpCode(pkt.op)
-            elif pkt.op == tftp.OpCode.ReadRequest:
+            # log request
+            self._log.info('(%s) req=%-12s file=%s block=%d' % (
+                addr.split(':')[0],
+                pkt.op.name,
+                pkt.filename.decode(),
+                pkt.options.blocksize()
+            ))
+            # handle read/write request
+            if pkt.op == tftp.OpCode.ReadRequest:
                 # check if handler wants to handle read
                 buffer = self._on_read(pkt)
                 if buffer is None:
@@ -154,12 +163,13 @@ class _Handler(asyncio.DatagramProtocol):
         try:
             res = self.on_packet(req, addrstr)
         except ServerError as e:
+            self._log.error('(%s) %s' % (addr[0], e))
             self._kill_transaction(addrstr)
             res = tftp.Error(e.code, e.message.encode('utf-8'))
         except Exception as e:
             # print error
-            self._log.error('failed to handle packet: %s' % e)
-            traceback.print_exc()
+            self._log.error('(%s) failed to handle packet: %s' % (addr[0], e))
+            print('\n%s' % traceback.format_exc(), file=sys.stderr)
             # format response
             self._kill_transaction(addrstr)
             res = tftp.Error(tftp.ErrorCode.NotDefined,
@@ -192,7 +202,7 @@ class TFTPServer:
         :param debug:     enable debugging if true
         """
         loglevel          = logging.DEBUG if debug else logging.INFO
-        self.log          = _logger('dhcp.server', loglevel)
+        self.log          = _logger('tftp.server', loglevel)
         self.address      = address
         self.interface    = interface
         self.reader       = self.reader if reader is None else reader
@@ -223,4 +233,5 @@ class TFTPServer:
         )
         loop   = asyncio.get_event_loop()
         point  = loop.create_datagram_endpoint(handle, local_addr=self.address)
+        self.log.info('Serving TFTP on %s port %d' % self.address)
         return asyncio.Task(point)
