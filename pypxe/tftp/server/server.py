@@ -12,7 +12,8 @@ from .handler import Reader, Writer
 
 #** Variables **#
 
-RequestHandler = Callable[[tftp.Request], Optional[io.IOBase]]
+RequestHandler  = Callable[[tftp.Request], Optional[io.IOBase]]
+CallbackHandler = Callable[[tftp.OpCode, io.IOBase], None]
 
 #** Functions **#
 
@@ -37,6 +38,7 @@ def _new_handler(
     log:       logging.Logger,
     reader:    RequestHandler,
     writer:    RequestHandler,
+    callback:  CallbackHandler,
     interface: Optional[str] = None,
 ) -> asyncio.DatagramProtocol:
     """
@@ -45,6 +47,7 @@ def _new_handler(
     :param log:       logging instance used for debugging
     :param reader:    function handler used to handle tftp read requests
     :param writer:    function handler used to handle tftp write requests
+    :param callback:  function called on completion of read/write request
     :param interface: network interface to bind socket to
     :return:          new handler to handle tftp packets
     """
@@ -52,6 +55,7 @@ def _new_handler(
         _log       = log
         _on_read   = reader
         _on_write  = writer
+        _callback  = callback
         _interface = None if interface is None else interface.encode('utf-8')
     return NewHandler
 
@@ -62,6 +66,7 @@ class _Handler(asyncio.DatagramProtocol):
     _log:       logging.Logger
     _on_read:   RequestHandler
     _on_write:  RequestHandler
+    _callback:  CallbackHandler
     _interface: Optional[bytes] = None
 
     def connection_made(self, transport: asyncio.DatagramTransport):
@@ -75,49 +80,49 @@ class _Handler(asyncio.DatagramProtocol):
 
     def _kill_transaction(self, addr: str):
         """kill any transactions taking place w/ an existing address"""
-        _, handler = self._connstate[addr]
-        handler.close()
-        del self._connstate[addr]
+        if addr in self._connstate:
+            _, handler = self._connstate[addr]
+            handler.close()
+            del self._connstate[addr]
 
-    def on_packet(self, req: tftp.Packet, addr: str) -> Optional[tftp.Packet]:
+    def on_packet(self, pkt: tftp.Packet, addr: str) -> Optional[tftp.Packet]:
         # check if address is newly connected to service
         if addr not in self._connstate:
-            if not req.is_request():
-                raise BadOpCode(req.op)
-            elif req.op == tftp.OpCode.ReadRequest:
+            if not pkt.is_request():
+                raise BadOpCode(pkt.op)
+            elif pkt.op == tftp.OpCode.ReadRequest:
                 # check if handler wants to handle read
-                buffer = self._on_read(req)
+                buffer = self._on_read(pkt)
                 if buffer is None:
                     raise ServerError(
                         tftp.ErrorCode.FileNotFound, 'file not found')
                 # spawn reader object
-                reader = Reader(buffer, req.options)
-                self._connstate[addr] = (tftp.OpCode.ReadRequest, reader)
+                reader = Reader(buffer, pkt.options)
+                self._connstate[addr] = (pkt, reader)
                 return reader.generate()
-            elif req.op == tftp.OpCode.WriteRequest:
+            elif pkt.op == tftp.OpCode.WriteRequest:
                 # check if handler wants to handle write
-                buffer = self._on_write(req)
+                buffer = self._on_write(pkt)
                 if buffer is None:
                     raise ServerError(
                         tftp.ErrorCode.FileAlreadyExists, 'file already exists')
                 # spawn writer object
-                writer = Writer(buffer, req.options)
-                self._connstate[addr] = (tftp.OpCode.WriteRequest, writer)
+                writer = Writer(buffer, pkt.options)
+                self._connstate[addr] = (pkt, writer)
                 return writer.generate()
         # if address was already messaged previously
         else:
-            if req.is_request():
-                self._kill_transaction(addr)
+            if pkt.is_request():
+                raise BadOpCode(pkt.op)
             # handle active read
-            opcode, handler = self._connstate[addr]
-            if opcode == tftp.OpCode.ReadRequest:
-                next = handler.next(req)
-                res  = handler.generate()
-                if not next:
-                    self._kill_transaction(addr)
-                return res
-            else:
-                raise NotImplementedError('write no supported yet')
+            request, handler = self._connstate[addr]
+            next = handler.next(pkt)
+            res  = handler.generate()
+            if not next:
+                handler.file.seek(0, 0)
+                self._callback(request, handler.file)
+                self._kill_transaction(addr)
+            return res
 
     def datagram_received(self, data: bytes, addr: Tuple[str, int]):
         """
@@ -133,18 +138,22 @@ class _Handler(asyncio.DatagramProtocol):
             self._log.debug('failed to parse TFTP packet: %s' % e)
             return
         # attempt to retrieve response
+        addrstr = '%s:%d' % addr
         try:
-            print(req)
-            res = self.on_packet(req, '%s:%d' % addr)
+            res = self.on_packet(req, addrstr)
         except ServerError as e:
+            self._kill_transaction(addrstr)
             res = tftp.Error(e.code, e.message.encode('utf-8'))
         except Exception as e:
+            # print error
             self._log.error('failed to handle packet: %s' % e)
             traceback.print_exc()
-            return
+            # format response
+            self._kill_transaction(addrstr)
+            res = tftp.Error(tftp.ErrorCode.NotDefined,
+                b'internal server error occured')
         # attempt to send response
         try:
-            print(res)
             if res is not None:
                 self._transport.sendto(res.to_bytes(), addr)
         except Exception as e:
@@ -155,15 +164,17 @@ class TFTPServer:
     """complete TFTP server used to handle and reply to packets"""
 
     def __init__(self,
-        reader:    Optional[RequestHandler] = None,
-        writer:    Optional[RequestHandler] = None,
-        address:   Tuple[str, int]          = ('0.0.0.0', 69),
-        interface: Optional[str]            = None,
-        debug:     bool                     = False,
+        reader:    Optional[RequestHandler]  = None,
+        writer:    Optional[RequestHandler]  = None,
+        callback:  Optional[CallbackHandler] = None,
+        address:   Tuple[str, int]           = ('0.0.0.0', 69),
+        interface: Optional[str]             = None,
+        debug:     bool                      = False,
     ):
         """
         :param reader:    read request handler for TFTP requests
         :param writer:    write request handler for TFTP requests
+        :param callback:  callback called after completion of read/write op
         :param address:   address to bind server to
         :param interface: network interface used to send replies
         :param debug:     enable debugging if true
@@ -174,11 +185,15 @@ class TFTPServer:
         self.interface    = interface
         self.reader       = self.reader if reader is None else reader
         self.writer       = self.writer if writer is None else writer
+        self.callback     = self.callback if callback is None else callback
 
     def reader(self, req: tftp.Request) -> Optional[io.IOBase]:
         pass
 
     def writer(self, req: tftp.Request) -> Optional[io.IOBase]:
+        pass
+
+    def callback(self, req: tftp.Request, file: io.IOBase):
         pass
 
     def run_forever(self) -> asyncio.Task:
@@ -191,6 +206,7 @@ class TFTPServer:
             log=self.log,
             reader=self.reader,
             writer=self.writer,
+            callback=self.callback,
             interface=self.interface
         )
         loop   = asyncio.get_event_loop()
