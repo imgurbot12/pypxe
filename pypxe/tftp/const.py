@@ -5,9 +5,15 @@ import enum
 
 #** Variables **#
 __all__ = [
+    'DefaultServerPort',
+
     'OpCode',
-    'RequestMode'
+    'RequestMode',
+    'ErrorCode'
 ]
+
+#** Variables **#
+DefaultServerPort = 69
 
 #** Classes **#
 
@@ -25,3 +31,14 @@ class RequestMode(enum.Enum):
     NetAscii = "netascii"
     Octet    = "octet"
     Mail     = "mail"
+
+class ErrorCode(enum.Enum):
+    """possible error codes used in response"""
+    NotDefined        = 0
+    FileNotFound      = 1
+    AccessViolation   = 2
+    DiskFull          = 3
+    IllegalOperation  = 4
+    UnknownTransferID = 5
+    FileAlreadyExists = 6
+    NoSuchUser        = 7

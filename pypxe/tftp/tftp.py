@@ -5,7 +5,7 @@ import struct
 from typing import Tuple, List
 
 from . import option, utils
-from .const import OpCode, RequestMode
+from .const import OpCode, RequestMode, ErrorCode
 
 #** Variables **#
 __all__ = [
@@ -15,7 +15,8 @@ __all__ = [
     'Request',
     'OptionAcknowledgement',
     'Acknowledgement',
-    'Data'
+    'Data',
+    'Error'
 ]
 
 #** Functions **#
@@ -36,17 +37,26 @@ def from_bytes(raw: bytes) -> 'Packet':
         return Acknowledgement.from_bytes(raw)
     elif op == OpCode.Data:
         return Data.from_bytes(raw)
+    elif op == OpCode.Error:
+        return Error.from_bytes(raw)
     else:
-        raise NotImplementedError('error type not supported yet!')
-        #TODO: have not written handler for error packet
+        raise NotImplementedError('invalid opcode: %d' % op)
 
 #** Classes **#
 
 class Packet:
+    """baseclass object for various TFTP packet objects"""
     op: OpCode = None
 
     def __str__(self) -> str:
-        return '<TFTP.Packet: %s>' % self.op.name
+        vr    = vars(self).items()
+        attrs = ', '.join('%s=%r'%(k,v) for k,v in vr if not k.startswith('_'))
+        attrs = '; '+attrs if attrs != '' else attrs
+        return '<TFTP.Packet: %s%s>' % (self.op.name, attrs)
+
+    def is_request(self) -> bool:
+        """return true if opcode is a request"""
+        return self.op in (OpCode.ReadRequest, OpCode.WriteRequest)
 
     def to_bytes(self) -> bytes:
         raise NotImplementedError('baseclass must be overwritten!')
@@ -72,7 +82,10 @@ class Request(Packet):
         self.op       = op
         self.filename = filename
         self.mode     = mode
-        self.options  = options
+        if isinstance(options, option.Options):
+            self.options = options
+        else:
+            self.options = option.Options(options)
 
     def to_bytes(self) -> bytes:
         """
@@ -111,7 +124,10 @@ class OptionAcknowledgement(Packet):
         """
         :param options: list of options that have been accepted
         """
-        self.options = options
+        if isinstance(options, option.Options):
+            self.options = options
+        else:
+            self.options = option.Options(options)
 
     def to_bytes(self) -> bytes:
         """
@@ -191,4 +207,37 @@ class Data(Packet):
         return cls(
             block=struct.unpack('>H', raw[2:4])[0],
             data=raw[4:],
+        )
+
+class Error(Packet):
+    op = OpCode.Error
+
+    def __init__(self, code: ErrorCode, message: bytes):
+        """
+        :param code:    error code sent in error packet
+        :param message: message sent with error code given
+        """
+        self.code    = code
+        self.message = message
+
+    def to_bytes(self) -> bytes:
+        """
+        convert request into byte-format for sending across the wire
+
+        :return: raw bytestring generated from request
+        """
+        return struct.pack('>H', self.op.value) + \
+            struct.pack('>H', self.code.value) + self.message
+
+    @classmethod
+    def from_bytes(cls, raw: bytes) -> 'Error':
+        """
+        convert raw-bytes into request object
+
+        :param raw: byte-string being parsed
+        :return:    generated request object
+        """
+        return cls(
+            code=struct.unpack('>H', raw[2:4])[0],
+            message=raw[4:],
         )
