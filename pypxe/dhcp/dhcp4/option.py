@@ -327,7 +327,6 @@ class Options:
         })
         self._list.extend(options)
 
-
 class Option(abc.ByteOperator):
     """base class for all option objects, allows conversion to/from bytes"""
     opcode = Param.OptionPad
