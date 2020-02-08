@@ -1,4 +1,17 @@
+"""
+complete TFTP server instance for easy control of reading/writing files
+"""
 from .. import tftp
+
+#** Variables **#
+__all__ = [
+    'ServerError',
+    'BadOpCode',
+
+    'RequestHandler',
+    'CallbackHandler',
+    'TFTPServer',
+]
 
 #** Classes **#
 
@@ -25,3 +38,6 @@ class BadOpCode(Exception):
         """
         super().__init__(tftp.ErrorCode.IllegalOperation,
             'unexpected op=%s' % op.name)
+
+#** Imports **#
+from .server import *

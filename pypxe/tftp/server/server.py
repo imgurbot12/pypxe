@@ -1,3 +1,6 @@
+"""
+server definition and handler design used to send/recieve incoming TFTP packets
+"""
 import io
 import sys
 import socket
@@ -11,8 +14,17 @@ from . import ServerError, BadOpCode
 from .handler import Reader, Writer
 
 #** Variables **#
+__all__ = [
+    'RequestHandler',
+    'CallbackHandler',
 
+    'TFTPServer',
+]
+
+#: function definition used to give file-object for reading/writing
 RequestHandler  = Callable[[tftp.Request], Optional[io.IOBase]]
+
+#: function definition for retrieving file-object after read/write request
 CallbackHandler = Callable[[tftp.OpCode, io.IOBase], None]
 
 #** Functions **#
