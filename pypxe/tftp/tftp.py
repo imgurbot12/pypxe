@@ -227,7 +227,7 @@ class Error(Packet):
         :return: raw bytestring generated from request
         """
         return struct.pack('>H', self.op.value) + \
-            struct.pack('>H', self.code.value) + self.message
+            struct.pack('>H', self.code.value) + self.message + b'\x00'
 
     @classmethod
     def from_bytes(cls, raw: bytes) -> 'Error':
@@ -239,5 +239,5 @@ class Error(Packet):
         """
         return cls(
             code=struct.unpack('>H', raw[2:4])[0],
-            message=raw[4:],
+            message=raw[4:-1],
         )
