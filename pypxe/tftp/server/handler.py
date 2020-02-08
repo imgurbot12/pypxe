@@ -55,7 +55,6 @@ class TFTPHandler:
         if self.block != -1:
             self.block = -1
             self.file.close()
-            print('handler closed!')
 
 class Reader(TFTPHandler):
     """handler used to handle read-request from bytes-buffer"""
