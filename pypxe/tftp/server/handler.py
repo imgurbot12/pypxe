@@ -5,7 +5,7 @@ import io
 from typing import Optional
 
 from .. import tftp, option
-from . import ServerError
+from . import ServerError, BadOpCode
 
 #** Classes **#
 
@@ -58,6 +58,12 @@ class Reader(TFTPHandler):
         self.file.seek(before, 0)
         return filesize
 
+    def index(self) -> int:
+        """get location to read from based on block number"""
+        if self.block > 0:
+            return self.blksize*(self.block-1)
+        return 0
+
     def generate(self) -> Optional[tftp.Packet]:
         """
         respond with packet last sent already for re-broadcast
@@ -68,8 +74,7 @@ class Reader(TFTPHandler):
         if self.is_closed:
             return None
         # generate option acknowledgement
-        elif self.block == 0:
-            if len(self.options) > 0:
+        elif self.block == 0 and len(self.options) > 0:
                 options = []
                 if self.blksize != 512:
                     options.append(
@@ -81,11 +86,11 @@ class Reader(TFTPHandler):
         # handle data transfer
         else:
             # update index to requested block if required
-            index = self.blksize*(self.block-1)
+            index = self.index()
             if index != self.file.tell():
                 self.file.seek(index, 0)
             # send data from file object
-            return tftp.Data(self.block, self.file.read(self.blksize))
+            return tftp.Data(self.block+1, self.file.read(self.blksize))
 
     def next(self, pkt: tftp.Packet) -> bool:
         """
@@ -103,18 +108,17 @@ class Reader(TFTPHandler):
         # handle incoming acknowledgement packet
         elif pkt.op == tftp.OpCode.Ack:
             # check for unexpected block number
-            if pkt.block != self.block:
-                raise BadBlockError(pkt.block, self.block)
+            if pkt.block != self.block+1:
+                raise BadBlockError(pkt.block, self.block+1)
             # update block number
             self.block += 1
             # check if last block acknowledged
-            if self.filesize < (self.block-1)*self.blksize:
+            if self.filesize < self.index():
                 self.close()
                 return False
         # handle unexpected packet type
         else:
-            raise ServerError(tftp.ErrorCode.IllegalOperation,
-                'unexpected operation: %s' % pkt.op.name)
+            raise BadOpCode(pkt.op)
         return True
 
     @classmethod
@@ -172,8 +176,7 @@ class Writer(TFTPHandler):
                 return False
         # handle other unexpected packets
         else:
-            raise ServerError(tftp.ErrorCode.IllegalOperation,
-                'unexpected operation: %s' % pkt.op.name)
+            raise BadOpCode(pkt.op)
         return True
 
     @classmethod
