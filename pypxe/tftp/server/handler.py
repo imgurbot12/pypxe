@@ -60,9 +60,7 @@ class Reader(TFTPHandler):
 
     def index(self) -> int:
         """get location to read from based on block number"""
-        if self.block > 0:
-            return self.blksize*(self.block-1)
-        return 0
+        return self.blksize*(self.block)
 
     def generate(self) -> Optional[tftp.Packet]:
         """
