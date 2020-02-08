@@ -5,9 +5,14 @@ import enum
 
 #** Variables **#
 __all__ = [
+    'DefaultServerPort',
+
     'OpCode',
     'MessageType'
 ]
+
+#** Variables **#
+DefaultServerPort = 67
 
 #** Classes **#
 

@@ -5,6 +5,7 @@ DHCP implementation for IPv4
 #** Variables **#
 __all__ = [
     # constants
+    'DefaultServerPort',
     'OpCode',
     'Param',
     'MessageType',
