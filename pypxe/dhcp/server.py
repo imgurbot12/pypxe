@@ -94,12 +94,14 @@ class _Handler(asyncio.DatagramProtocol):
             req = self._factory.from_bytes(data)
         except Exception as e:
             self._log.debug('failed to parse DHCP packet: %s' % e)
+            return
         # attempt to retrieve response
         try:
             res = self.on_packet(req)
         except Exception as e:
             self._log.error('failed to handle packet: %s' % e)
             traceback.print_exc()
+            return
         # attempt to send response
         try:
             if res is not None:
