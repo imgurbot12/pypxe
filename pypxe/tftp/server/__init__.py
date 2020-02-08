@@ -27,9 +27,9 @@ class ServerError(Exception):
         self.message = message
 
     def __str__(self) -> str:
-        return f'tftp-error[{self.code.name}]: {self.message}'
+        return f'{self.code.name}: {self.message}'
 
-class BadOpCode(Exception):
+class BadOpCode(ServerError):
     """error to be reaised on unexpected operation"""
 
     def __init__(self, op: tftp.OpCode):
