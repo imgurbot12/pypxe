@@ -15,3 +15,13 @@ class ServerError(Exception):
 
     def __str__(self) -> str:
         return f'tftp-error[{self.code.name}]: {self.message}'
+
+class BadOpCode(Exception):
+    """error to be reaised on unexpected operation"""
+
+    def __init__(self, op: tftp.OpCode):
+        """
+        :param op: opcode given that was unexpected
+        """
+        super().__init__(tftp.ErrorCode.IllegalOperation,
+            'unexpected op=%s' % op.name)
