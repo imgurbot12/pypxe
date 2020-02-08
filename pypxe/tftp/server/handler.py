@@ -46,6 +46,7 @@ class TFTPHandler:
         if self.block != -1:
             self.block = -1
             self.file.close()
+            print('handler closed!')
 
 class Reader(TFTPHandler):
     """handler used to handle read-request from bytes-buffer"""
@@ -82,7 +83,7 @@ class Reader(TFTPHandler):
                         option.Option(option.Param.TotalSize, self.filesize))
                 return tftp.OptionAcknowledgement(options)
         # handle data transfer
-        else:
+        elif self.index() <= self.file.tell():
             # update index to requested block if required
             index = self.index()
             if index != self.file.tell():
@@ -112,7 +113,6 @@ class Reader(TFTPHandler):
             self.block += 1
             # check if last block acknowledged
             if self.filesize < self.index():
-                self.close()
                 return False
         # handle unexpected packet type
         else:
