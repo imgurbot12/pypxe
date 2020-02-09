@@ -6,7 +6,7 @@ import socket
 import asyncio
 import logging
 import traceback
-from dhcp import dhcp4, dhcp6
+from . import dhcp4, dhcp6
 from typing import Union, Callable, Optional, Tuple
 
 #** Variables **#
@@ -32,9 +32,9 @@ def _logger(name: str, loglevel: int) -> logging.Logger:
     log = logging.getLogger(name)
     log.setLevel(loglevel)
     # spawn handler
-    fmt     = logging.Formatter(
-        '%(asctime)s [%(process)d] [%(levelname)s] %(message)s')
+    fmt     = logging.Formatter('[%(process)d] [%(levelname)s] %(message)s')
     handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(fmt)
     handler.setLevel(loglevel)
     log.handlers.append(handler)
     return log
@@ -93,22 +93,22 @@ class _Handler(asyncio.DatagramProtocol):
         try:
             req = self._factory.from_bytes(data)
         except Exception as e:
-            self._log.debug('failed to parse DHCP packet: %s' % e)
+            self._log.debug('(%s) failed to parse DHCP: %s' % (addr[0], e))
             return
         # attempt to retrieve response
         try:
             res = self.on_packet(req)
         except Exception as e:
-            self._log.error('failed to handle packet: %s' % e)
-            traceback.print_exc()
+            self._log.error('(%s) failed to handle packet: %s' % (addr[0], e))
+            print('\n%s' % traceback.format_exc(), file=sys.stderr)
             return
         # attempt to send response
         try:
             if res is not None:
                 self._transport.sendto(res.to_bytes(), ('255.255.255.255', 68))
         except Exception as e:
-            self._log.error('unable to send response: %s' % e)
-            traceback.print_exc()
+            self._log.error('(%s) unable to send response: %s' % (addr[0], e))
+            print('\n%s' % traceback.format_exc(), file=sys.stderr)
 
 class DHCPServer:
     """complete DHCP server used to handle and reply to packets"""
@@ -152,4 +152,5 @@ class DHCPServer:
         loop   = asyncio.get_event_loop()
         point  = loop.create_datagram_endpoint(handle,
             local_addr=self.address, allow_broadcast=True)
+        self.log.info('Serving DHCP on %s port %d' % self.address)
         return asyncio.Task(point)
