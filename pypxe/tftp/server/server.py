@@ -39,8 +39,7 @@ def _logger(name: str, loglevel: int) -> logging.Logger:
     log = logging.getLogger(name)
     log.setLevel(loglevel)
     # spawn handler
-    fmt     = logging.Formatter(
-        '[%(process)d] [%(levelname)s] %(message)s')
+    fmt     = logging.Formatter('[%(process)d] [%(levelname)s] %(message)s')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(fmt)
     handler.setLevel(loglevel)
@@ -156,7 +155,7 @@ class _Handler(asyncio.DatagramProtocol):
         try:
             req = tftp.from_bytes(data)
         except Exception as e:
-            self._log.debug('failed to parse TFTP packet: %s' % e)
+            self._log.debug('(%s) failed to parse TFTP: %s' % (addr[0], e))
             return
         # attempt to retrieve response
         addrstr = '%s:%d' % addr
@@ -179,8 +178,8 @@ class _Handler(asyncio.DatagramProtocol):
             if res is not None:
                 self._transport.sendto(res.to_bytes(), addr)
         except Exception as e:
-            self._log.error('unable to send response: %s' % e)
-            traceback.print_exc()
+            self._log.error('(%s) unable to send response: %s' % (addr[0], e))
+            print('\n%s' % traceback.format_exc(), file=sys.stderr)
 
 class TFTPServer:
     """complete TFTP server used to handle and reply to packets"""
