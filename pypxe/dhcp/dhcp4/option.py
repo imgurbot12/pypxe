@@ -26,7 +26,6 @@ __all__ = [
     'OptParameterRequestList',
     'OptMaxMessageSize',
     'OptClassIdentifier',
-    'OptClientIdentifier',
     'OptTFTPServerName',
     'OptTFTPServerIP',
     'OptBootFileName',
@@ -216,7 +215,10 @@ def _stringify(item: Any, prefix: str = '') -> str:
     if hasattr(item, 'to_string'):
         return item.to_string()
     elif isinstance(item, bytes):
-        return item.hex()
+        try:
+            return item.decode()
+        except UnicodeDecodeError:
+            return item.hex()
     elif isinstance(item, (list, Options)):
         return prefix+'\n'+'\n'.join(prefix+' - %s'%_stringify(i) for i in item)
     elif isinstance(item, enum.Flag):
@@ -246,7 +248,7 @@ def _from_bytes(raw: bytes) -> Tuple['Option', int]:
         opt = _options[raw[0]]
         return opt.from_bytes(raw[2:optlen]), optlen
     # else if no option was found
-    return Option.from_bytes(raw[2:optlen]), optlen
+    return Option.from_bytes(raw[:optlen]), optlen
 
 def from_bytes(raw: bytes) -> List['Option']:
     """
@@ -331,11 +333,13 @@ class Option(abc.ByteOperator):
     """base class for all option objects, allows conversion to/from bytes"""
     opcode = Param.OptionPad
 
-    def __init__(self, value: bytes):
+    def __init__(self, value: bytes, opcode: Param = Param.OptionPad):
         """
-        :param value: raw-bytes value being passed as option
+        :param value:  raw-bytes value being passed as option
+        :param opcode: opcode for option object
         """
-        self.value = value
+        self.value  = value
+        self.opcode = opcode
 
     def __str__(self) -> str:
         return '<Option: %s>' % (self.opcode.name)
@@ -354,6 +358,7 @@ class Option(abc.ByteOperator):
             '\n'.join(prefix+' - %s: %s' % (
                 k,_stringify(v, prefix))
                 for k,v in vars(self).items()
+                if k != 'opcode'
             )
         )
 
@@ -364,7 +369,10 @@ class Option(abc.ByteOperator):
     @classmethod
     def from_bytes(cls, raw: bytes) -> 'Option':
         """convert raw-bytes into option object"""
-        return cls(raw)
+        return cls(
+            value=raw[2:],
+            opcode=abc.find_enum(Param, raw[0])
+        )
 
 class _IPv4Option(Option):
     """base-class implementation for single ip-paramter option classes"""
@@ -494,31 +502,6 @@ class OptMaxMessageSize(Option):
 class OptClassIdentifier(Option):
     """includes vendor information"""
     opcode = Param.ClassIdentifier
-
-class OptClientIdentifier(Option):
-    """extended client identification"""
-    opcode = Param.ClientIdentifier
-
-    def __init__(self, hwtype: iana.HWType, mac: net.MacAddress):
-        """
-        :param hwtype: hardware-type of mac address being given
-        :param mac:    mac-address of client
-        """
-        self.hwtype = hwtype
-        self.mac    = mac
-
-    def to_bytes(self) -> bytes:
-        """convert option to raw byte-string"""
-        raw = self.mac.to_bytes()
-        return bytes((self.opcode.value, len(raw)+1, self.hwtype.value)) + raw
-
-    @staticmethod
-    def from_bytes(raw: bytes) -> 'OptClientIdentifier':
-        """convert raw-bytes into option object"""
-        return OptClientIdentifier(
-            hwtype=abc.find_enum(iana.HWType, raw[0]),
-            mac=net.MacAddress.from_bytes(raw[1:])
-        )
 
 class OptTFTPServerName(Option):
     """set TFTP server-name for PXE boot"""
