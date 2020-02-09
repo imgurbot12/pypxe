@@ -115,7 +115,7 @@ class _Handler(asyncio.DatagramProtocol):
                 buffer = self._on_read(pkt)
                 if buffer is None:
                     raise ServerError(
-                        tftp.ErrorCode.FileNotFound, 'file not found')
+                        tftp.ErrorCode.FileNotFound, pkt.filename.decode())
                 # spawn reader object
                 reader = Reader(buffer, pkt.options)
                 self._connstate[addr] = (pkt, reader)
@@ -125,7 +125,7 @@ class _Handler(asyncio.DatagramProtocol):
                 buffer = self._on_write(pkt)
                 if buffer is None:
                     raise ServerError(
-                        tftp.ErrorCode.FileAlreadyExists, 'file already exists')
+                        tftp.ErrorCode.FileAlreadyExists, pkt.filename.decode())
                 # spawn writer object
                 writer = Writer(buffer, pkt.options)
                 self._connstate[addr] = (pkt, writer)
