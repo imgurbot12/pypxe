@@ -127,6 +127,9 @@ class Reader(TFTPHandler):
                     raise BadBlockError(pkt.block, 0)
                 self._skip = False
                 return True
+            # handle retransmission of last block
+            if pkt.block == self.block:
+                return True
             # check for unexpected block number
             if pkt.block != self.block+1:
                 raise BadBlockError(pkt.block, self.block+1)
