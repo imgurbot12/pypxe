@@ -118,7 +118,7 @@ class Reader(TFTPHandler):
             return False
         # raise exception on error
         elif pkt.op == tftp.OpCode.Error:
-            raise Exception(f'client err[{pkt.code.name}]: {pkt.code.message}')
+            raise Exception(f'client err[{pkt.code.name}]: {pkt.message}')
         # handle incoming acknowledgement packet
         elif pkt.op == tftp.OpCode.Ack:
             # handle first ack if options ackowledged packet was sent
