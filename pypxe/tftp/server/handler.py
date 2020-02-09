@@ -59,6 +59,11 @@ class TFTPHandler:
 class Reader(TFTPHandler):
     """handler used to handle read-request from bytes-buffer"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._optack = False
+        self._skip   = False
+
     @property
     def filesize(self) -> int:
         """retrieve filesize from file object"""
@@ -81,15 +86,17 @@ class Reader(TFTPHandler):
         if self.is_closed:
             return None
         # generate option acknowledgement
-        elif self.block == 0 and len(self.options) > 0:
-                options = []
-                if self.blksize != 512:
-                    options.append(
-                        option.Option(option.Param.BlockSize, self.blksize))
-                if self.tsize is not None:
-                    options.append(
-                        option.Option(option.Param.TotalSize, self.filesize))
-                return tftp.OptionAcknowledgement(options)
+        elif self.block == 0 and len(self.options) > 0 and not self._optack:
+            self._optack = self._skip = True
+            # send options acknowledgement
+            options = []
+            if self.blksize != 512:
+                options.append(
+                    option.Option(option.Param.BlockSize, self.blksize))
+            if self.tsize is not None:
+                options.append(
+                    option.Option(option.Param.TotalSize, self.filesize))
+            return tftp.OptionAcknowledgement(options)
         # handle data transfer
         elif self.index() <= self.file.tell():
             # update index to requested block if required
@@ -114,6 +121,12 @@ class Reader(TFTPHandler):
             raise Exception(f'client err[{pkt.code.name}]: {pkt.code.message}')
         # handle incoming acknowledgement packet
         elif pkt.op == tftp.OpCode.Ack:
+            # handle first ack if options ackowledged packet was sent
+            if self._skip:
+                if pkt.block != 0:
+                    raise BadBlockError(pkt.block, 0)
+                self._skip = False
+                return True
             # check for unexpected block number
             if pkt.block != self.block+1:
                 raise BadBlockError(pkt.block, self.block+1)
