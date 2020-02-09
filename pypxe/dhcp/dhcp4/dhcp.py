@@ -203,4 +203,3 @@ Options:
             boot_file=raw[108:236].rstrip(b'\x00'),
             options=option.from_bytes(raw[240:]),
         )
-        #TODO: to/from bytes has not yet been checked
