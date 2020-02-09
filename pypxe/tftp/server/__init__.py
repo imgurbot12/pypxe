@@ -1,12 +1,16 @@
 """
 complete TFTP server instance for easy control of reading/writing files
 """
+import io
+import os
 from .. import tftp
+from typing import Optional
 
 #** Variables **#
 __all__ = [
     'ServerError',
     'BadOpCode',
+    'FileFinder',
 
     'RequestHandler',
     'CallbackHandler',
@@ -38,6 +42,29 @@ class BadOpCode(ServerError):
         """
         super().__init__(tftp.ErrorCode.IllegalOperation,
             'unexpected op=%s' % op.name)
+
+class FileFinder:
+    """utility to find and return file objects from a given starting filepath"""
+
+    def __init__(self, basedir: str):
+        """
+        :param basdir: base directory to pull all other files from
+        """
+        if not os.path.exists(basedir):
+            raise Exception('no such path: %s' % basedir)
+        self.basedir = os.path.realpath(basedir)
+
+    def find(self, path: str, mode: str = 'rb') -> Optional[io.IOBase]:
+        """
+        retrieve file object if path exists else return none
+
+        :param path: path requested from directory
+        :param mode: mode to open file in if found
+        :return:     file object or none if not found
+        """
+        fp = os.path.join(self.basedir, path)
+        if mode.startswith('w') or mode.startswith('a') or os.path.exists(fp):
+            return open(fp, mode)
 
 #** Imports **#
 from .server import *
