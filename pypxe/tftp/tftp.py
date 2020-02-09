@@ -238,6 +238,6 @@ class Error(Packet):
         :return:    generated request object
         """
         return cls(
-            code=struct.unpack('>H', raw[2:4])[0],
+            code=utils.find_enum(ErrorCode, struct.unpack('>H', raw[2:4])[0]),
             message=raw[4:-1],
         )
