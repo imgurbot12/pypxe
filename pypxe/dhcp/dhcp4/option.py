@@ -371,7 +371,7 @@ class Option(abc.ByteOperator):
         """convert raw-bytes into option object"""
         return cls(
             value=raw[2:],
-            opcode=abc.find_enum(Param, raw[0])
+            opcode=abc.find_enum(Param, raw[0], Param.OptionPad)
         )
 
 class _IPv4Option(Option):
