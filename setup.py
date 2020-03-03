@@ -20,7 +20,7 @@ contains libraries for:
 
 setup(
     name='pypxe',
-    version='1.0.0',
+    version='1.0.1',
     url='https://github.com/imgurbot12/pypxe',
     license=None,
     description=DESCRIPTION.split('\n')[0],
