@@ -40,6 +40,7 @@ def _logger(name: str, loglevel: int) -> logging.Logger:
     return log
 
 def _new_handler(
+    num:       int,
     log:       logging.Logger,
     factory:   DHCPPacket,
     handler:   PacketHandler,
@@ -48,6 +49,7 @@ def _new_handler(
     """
     spawn new subclass of handler to handle incoming DHCP packets
 
+    :param num:       number assigned to handler when spawning multiple
     :param log:       logging instance used for debugging
     :param factory:   dhcp-class used to deserialize raw bytes
     :param handler:   function used to handle packets formed with factory
@@ -55,6 +57,7 @@ def _new_handler(
     :return:          new handler to handle dhcp packets
     """
     class NewHandler(_Handler):
+        _num       = num
         _log       = log
         _factory   = factory
         _interface = None if interface is None else interface.encode('utf-8')
@@ -67,6 +70,7 @@ def _new_handler(
 
 class _Handler(asyncio.DatagramProtocol):
     """metaclass handler for incoming udp packets built for DHCPv4"""
+    _num:       int
     _log:       logging.Logger
     _factory:   DHCPPacket
     _interface: Optional[bytes] = None
@@ -137,20 +141,26 @@ class DHCPServer:
     def handler(self, pkt: DHCPPacket) -> Optional[DHCPPacket]:
         pass
 
-    def run_forever(self) -> asyncio.Task:
+    def run_forever(self, threads: int = 5) -> asyncio.Future:
         """
         spawn DHCP server and start handling incoming packets
 
-        :return: asyncio future object in charge of running server
+        :param threads: number of handlers spawned in parralel
+        :return:        asyncio future object in charge of running server
         """
-        handle = _new_handler(
-            log=self.log,
-            factory=self.factory,
-            handler=self.handler,
-            interface=self.interface
-        )
-        loop   = asyncio.get_event_loop()
-        point  = loop.create_datagram_endpoint(handle,
-            local_addr=self.address, allow_broadcast=True)
+        loop      = asyncio.get_event_loop()
+        endpoints = []
+        for n in range(threads):
+            handle = _new_handler(
+                num=n,
+                log=self.log,
+                factory=self.factory,
+                handler=self.handler,
+                interface=self.interface
+            )
+            point = loop.create_datagram_endpoint(handle,
+                local_addr=self.address, reuse_port=True, allow_broadcast=True)
+            endpoints.append(point)
+        # return gathered endpoints
         self.log.info('Serving DHCP on %s port %d' % self.address)
-        return asyncio.Task(point)
+        return asyncio.gather(*endpoints)
